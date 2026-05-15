@@ -248,7 +248,8 @@
                     <div class="pulse"></div>
                     LIVE CAMERA
                 </div>
-                <img src="{{ url_for('video_feed') }}" alt="Live Feed">
+                <video id="video" autoplay playsinline style="width: 100%; border-radius: 1rem;"></video>
+                <canvas id="canvas" style="display:none;"></canvas>
             </div>
             <p style="font-size: 0.9rem; margin-top: 1rem; opacity: 0.8;">
                 AI is currently processing 30 frames per second using a Deep Convolutional Neural Network (CNN).
@@ -300,31 +301,63 @@
     </footer>
 
     <script>
-        function updateStatus() {
-            fetch('/status')
-                .then(response => response.json())
-                .then(data => {
-                    const emotionEl = document.getElementById('emotion-text');
-                    const confidenceEl = document.getElementById('confidence-text');
-                    const suggestionEl = document.getElementById('suggestion-text');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
-                    // Update values
-                    emotionEl.innerText = data.emotion;
-                    confidenceEl.innerText = data.confidence + " Confidence";
-                    suggestionEl.innerText = data.suggestion;
-
-                    // Dynamic colors based on emotion
-                    if(data.emotion === 'Happy') emotionEl.style.color = '#10b981';
-                    else if(data.emotion === 'Angry') emotionEl.style.color = '#ef4444';
-                    else if(data.emotion === 'Sad') emotionEl.style.color = '#6366f1';
-                    else if(data.emotion === 'Scanning...') emotionEl.style.color = '#f8fafc';
-                    else emotionEl.style.color = '#6366f1';
-                })
-                .catch(err => console.error("Status fetch failed", err));
+        // Start Camera
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error("Camera access denied", err);
+                alert("Please allow camera access to use this app!");
+            }
         }
 
-        // Update every 500ms
-        setInterval(updateStatus, 500);
+        async function predictEmotion() {
+            // Draw video frame to canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Get base64 image
+            const imageData = canvas.toDataURL('image/jpeg', 0.5);
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+                const data = await response.json();
+
+                if (data.error) return;
+
+                const emotionEl = document.getElementById('emotion-text');
+                const confidenceEl = document.getElementById('confidence-text');
+                const suggestionEl = document.getElementById('suggestion-text');
+
+                emotionEl.innerText = data.emotion;
+                confidenceEl.innerText = data.confidence + " Confidence";
+                suggestionEl.innerText = data.suggestion;
+
+                // Colors
+                if(data.emotion === 'Happy') emotionEl.style.color = '#10b981';
+                else if(data.emotion === 'Angry') emotionEl.style.color = '#ef4444';
+                else if(data.emotion === 'Sad') emotionEl.style.color = '#6366f1';
+                else if(data.emotion === 'Scanning...') emotionEl.style.color = '#f8fafc';
+                else emotionEl.style.color = '#6366f1';
+
+            } catch (err) {
+                console.error("Prediction failed", err);
+            }
+        }
+
+        // Initialize
+        startCamera();
+        setInterval(predictEmotion, 500);
     </script>
 </body>
 </html>
