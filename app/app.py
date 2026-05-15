@@ -17,11 +17,11 @@ app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
 
 # Load Face Classifier (Haar Cascade)
 try:
-    CASCADE_PATH = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    face_classifier = cv2.CascadeClassifier(CASCADE_PATH)
+    CASCADE_PATH = BASE_DIR / 'haarcascade_frontalface_default.xml'
+    face_classifier = cv2.CascadeClassifier(str(CASCADE_PATH))
     if face_classifier.empty():
         raise Exception("Cascade Classifier is empty")
-    print("✓ Face Classifier Loaded")
+    print(f"SUCCESS: Face Classifier Loaded from: {CASCADE_PATH}")
 except Exception as e:
     print(f"ERROR loading face classifier: {e}")
     face_classifier = None
@@ -31,7 +31,7 @@ MODEL_PATH = BASE_DIR.parent / 'models' / 'simple_cnn.h5'
 try:
     if MODEL_PATH.exists():
         model = load_model(str(MODEL_PATH))
-        print("✓ Emotion Model Loaded")
+        print("SUCCESS: Emotion Model Loaded")
     else:
         print(f"WARNING: Model not found at {MODEL_PATH}")
         model = None
@@ -69,6 +69,12 @@ from PIL import Image
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        # CHECK MODELS
+        if face_classifier is None:
+            return jsonify({"emotion": "Detector missing", "confidence": 0, "suggestion": "The face detector XML file is not loaded."})
+        if model is None:
+            return jsonify({"emotion": "Model missing", "confidence": 0, "suggestion": "The trained emotion model (.h5) is not loaded."})
+
         data = request.json
         image_data = data['image'].split(',')[1]
         image_bytes = base64.b64decode(image_data)
@@ -78,18 +84,18 @@ def predict():
         frame = np.array(img)
         gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         
-        # Detect faces with improved sensitivity
+        # HIGH SENSITIVITY DETECTION
         faces = face_classifier.detectMultiScale(
             gray, 
-            scaleFactor=1.3, 
-            minNeighbors=5, 
-            minSize=(30, 30)
+            scaleFactor=1.1, 
+            minNeighbors=3, 
+            minSize=(20, 20)
         )
         
-        print(f"DEBUG: Found {len(faces)} faces in frame") # Log to Render
+        print(f"DEBUG: Found {len(faces)} faces in frame")
         
         if len(faces) == 0:
-            return jsonify({"emotion": "Scanning...", "confidence": 0, "suggestion": get_recommendation("Scanning...")})
+            return jsonify({"emotion": "Searching...", "confidence": 0, "suggestion": "No face detected. Get closer and look directly at the camera."})
 
         # Process the first face
         (x, y, w, h) = faces[0]
