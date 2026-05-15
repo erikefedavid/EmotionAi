@@ -4,20 +4,33 @@ import numpy as np
 from flask import Flask, render_template, Response, jsonify, request
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
-# Correctly set paths for Render
+# Robust pathing for Render
 BASE_DIR = Path(__file__).parent
 app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
 
-# Load Model
-MODEL_PATH = BASE_DIR.parent / 'models' / 'simple_cnn.h5'
-face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+# Load Face Classifier (Haar Cascade)
+try:
+    CASCADE_PATH = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+    face_classifier = cv2.CascadeClassifier(CASCADE_PATH)
+    if face_classifier.empty():
+        raise Exception("Cascade Classifier is empty")
+    print("✓ Face Classifier Loaded")
+except Exception as e:
+    print(f"ERROR loading face classifier: {e}")
+    face_classifier = None
 
-# Check if model exists
-if not MODEL_PATH.exists():
-    print(f"WARNING: Model not found at {MODEL_PATH}. App will start but prediction will fail.")
+# Load Emotion Model
+MODEL_PATH = BASE_DIR.parent / 'models' / 'simple_cnn.h5'
+try:
+    if MODEL_PATH.exists():
+        model = load_model(str(MODEL_PATH))
+        print("✓ Emotion Model Loaded")
+    else:
+        print(f"WARNING: Model not found at {MODEL_PATH}")
+        model = None
+except Exception as e:
+    print(f"ERROR loading model: {e}")
     model = None
-else:
-    model = load_model(str(MODEL_PATH))
 
 EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise"]
 current_state = {"emotion": "Scanning...", "confidence": 0}
