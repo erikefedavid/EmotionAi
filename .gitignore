@@ -2,7 +2,9 @@ venv/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-models/*.h5
+# Allow only the simple CNN model, ignore others
+models/resnet50_fer.h5
+!models/simple_cnn.h5
 data/raw/*
 data/processed/*
 data/train/*
