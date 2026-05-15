@@ -1,7 +1,7 @@
 import os
 import cv2
 import numpy as np
-from flask import Flask, render_template, Response, jsonify
+from flask import Flask, render_template, Response, jsonify, request
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
 from pathlib import Path
