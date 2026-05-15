@@ -58,8 +58,15 @@ def predict():
         frame = np.array(img)
         gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         
-        # Detect faces
-        faces = face_classifier.detectMultiScale(gray, 1.1, 5)
+        # Detect faces with improved sensitivity
+        faces = face_classifier.detectMultiScale(
+            gray, 
+            scaleFactor=1.3, 
+            minNeighbors=5, 
+            minSize=(30, 30)
+        )
+        
+        print(f"DEBUG: Found {len(faces)} faces in frame") # Log to Render
         
         if len(faces) == 0:
             return jsonify({"emotion": "Scanning...", "confidence": 0, "suggestion": get_recommendation("Scanning...")})
