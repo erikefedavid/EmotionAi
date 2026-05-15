@@ -27,26 +27,21 @@ except Exception as e:
     face_classifier = None
 
 # Load Emotion Model
-MODEL_NAME = 'simple_cnn.h5'
-possible_model_paths = [
-    BASE_DIR.parent / 'models' / MODEL_NAME,
-    BASE_DIR / 'models' / MODEL_NAME,
-    Path(os.getcwd()) / 'models' / MODEL_NAME,
-    Path('/opt/render/project/src/models') / MODEL_NAME # Render specific
-]
-
-model = None
-for path in possible_model_paths:
-    if path.exists():
-        try:
-            model = load_model(str(path))
-            print(f"SUCCESS: Emotion Model Loaded from: {path}")
-            break
-        except Exception as e:
-            print(f"ERROR loading model at {path}: {e}")
-
-if model is None:
-    print("CRITICAL: Emotion Model not found in any expected location.")
+try:
+    MODEL_PATH = BASE_DIR / 'simple_cnn.h5'
+    if not MODEL_PATH.exists():
+        # Fallback to parent/models just in case
+        MODEL_PATH = BASE_DIR.parent / 'models' / 'simple_cnn.h5'
+    
+    if MODEL_PATH.exists():
+        model = load_model(str(MODEL_PATH))
+        print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
+    else:
+        print("CRITICAL: Emotion Model not found anywhere!")
+        model = None
+except Exception as e:
+    print(f"ERROR loading model: {e}")
+    model = None
 
 EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise"]
 current_state = {"emotion": "Scanning...", "confidence": 0}
