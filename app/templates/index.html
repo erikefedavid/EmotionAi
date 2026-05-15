@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FER System | B.Sc Project</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #ec4899;
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
+            color: var(--text);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        .navbar {
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.5rem;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .main-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 2rem;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+
+        .video-box {
+            position: relative;
+            border-radius: 1rem;
+            overflow: hidden;
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .video-box img {
+            width: 100%;
+            display: block;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(0,0,0,0.6);
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid var(--primary);
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .results-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .emotion-display {
+            text-align: center;
+        }
+
+        .emotion-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            opacity: 0.6;
+            margin-bottom: 0.5rem;
+        }
+
+        .emotion-value {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 0;
+            color: var(--primary);
+            text-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .suggestion-card {
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .suggestion-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stat-item {
+            background: rgba(255,255,255,0.05);
+            padding: 1rem;
+            border-radius: 0.8rem;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            opacity: 0.6;
+            text-transform: uppercase;
+        }
+
+        .footer {
+            padding: 2rem;
+            text-align: center;
+            opacity: 0.6;
+            font-size: 0.8rem;
+        }
+
+        /* Animations */
+        .fade-up {
+            animation: fadeUp 0.8s ease-out forwards;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, var(--primary), var(--secondary));
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        /* Icons */
+        .icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            mask-size: contain;
+            mask-repeat: no-repeat;
+            -webkit-mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">EmotionAI v2.0</div>
+        <div style="font-size: 0.9rem; opacity: 0.8;">B.Sc Final Project</div>
+    </nav>
+
+    <div class="main-container">
+        <!-- Left: Video Feed -->
+        <div class="card fade-up">
+            <h2 style="margin-top: 0;">Real-time Analysis</h2>
+            <div class="video-box">
+                <div class="status-badge">
+                    <div class="pulse"></div>
+                    LIVE CAMERA
+                </div>
+                <img src="{{ url_for('video_feed') }}" alt="Live Feed">
+            </div>
+            <p style="font-size: 0.9rem; margin-top: 1rem; opacity: 0.8;">
+                AI is currently processing 30 frames per second using a Deep Convolutional Neural Network (CNN).
+            </p>
+        </div>
+
+        <!-- Right: Results & Suggestions -->
+        <div class="results-panel">
+            <div class="card fade-up" style="animation-delay: 0.2s;">
+                <div class="emotion-display">
+                    <p class="emotion-title">Detected Mood</p>
+                    <h2 class="emotion-value" id="emotion-text">Scanning...</h2>
+                    <p id="confidence-text" style="font-weight: 600; opacity: 0.8; margin-top: 0.5rem;">0% Confidence</p>
+                </div>
+            </div>
+
+            <div class="card suggestion-card fade-up" style="animation-delay: 0.4s;">
+                <div class="suggestion-title">✨ Smart Suggestion</div>
+                <p id="suggestion-text" style="margin: 0; line-height: 1.6;">Please position your face clearly in front of the camera to receive personalized feedback.</p>
+            </div>
+
+            <div class="card fade-up" style="animation-delay: 0.6s;">
+                <div class="suggestion-title">📊 System Performance</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-val">59.7%</span>
+                        <span class="stat-label">Model Accuracy</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-val">CNN</span>
+                        <span class="stat-label">Architecture</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-val">23k</span>
+                        <span class="stat-label">Training Images</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-val">CPU</span>
+                        <span class="stat-label">Processing</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>Student Name: <strong>Ezekiel Francis</strong> | Supervisor: <strong>Dr. Afe</strong></p>
+        <p>Department of Computer Science | Lead City University &copy; 2026</p>
+    </footer>
+
+    <script>
+        function updateStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    const emotionEl = document.getElementById('emotion-text');
+                    const confidenceEl = document.getElementById('confidence-text');
+                    const suggestionEl = document.getElementById('suggestion-text');
+
+                    // Update values
+                    emotionEl.innerText = data.emotion;
+                    confidenceEl.innerText = data.confidence + " Confidence";
+                    suggestionEl.innerText = data.suggestion;
+
+                    // Dynamic colors based on emotion
+                    if(data.emotion === 'Happy') emotionEl.style.color = '#10b981';
+                    else if(data.emotion === 'Angry') emotionEl.style.color = '#ef4444';
+                    else if(data.emotion === 'Sad') emotionEl.style.color = '#6366f1';
+                    else if(data.emotion === 'Scanning...') emotionEl.style.color = '#f8fafc';
+                    else emotionEl.style.color = '#6366f1';
+                })
+                .catch(err => console.error("Status fetch failed", err));
+        }
+
+        // Update every 500ms
+        setInterval(updateStatus, 500);
+    </script>
+</body>
+</html>
