@@ -57,17 +57,26 @@
 
         .main-container {
             max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 1.5rem;
+            margin: 1rem auto;
+            padding: 0 1rem;
             display: grid;
             grid-template-columns: 1.5fr 1fr;
-            gap: 2rem;
+            gap: 1.5rem;
             flex-grow: 1;
         }
 
         @media (max-width: 900px) {
             .main-container {
                 grid-template-columns: 1fr;
+                gap: 1rem;
+                margin: 0.5rem auto;
+            }
+            .card {
+                padding: 1.5rem;
+                border-radius: 1rem;
+            }
+            .emotion-value {
+                font-size: 2.5rem;
             }
         }
 
@@ -78,6 +87,7 @@
             padding: 2rem;
             backdrop-filter: blur(12px);
             box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            width: 100%;
         }
 
         .video-box {
@@ -86,11 +96,17 @@
             overflow: hidden;
             border: 2px solid var(--primary);
             box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+            background: #000;
+            aspect-ratio: 4/3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .video-box img {
+        #video {
             width: 100%;
-            display: block;
+            height: 100%;
+            object-fit: cover;
         }
 
         .status-badge {
