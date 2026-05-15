@@ -4,12 +4,12 @@ import numpy as np
 from flask import Flask, render_template, Response, jsonify, request
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
-from pathlib import Path
-
-app = Flask(__name__)
+# Correctly set paths for Render
+BASE_DIR = Path(__file__).parent
+app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
 
 # Load Model
-MODEL_PATH = Path(__file__).parent.parent / 'models' / 'simple_cnn.h5'
+MODEL_PATH = BASE_DIR.parent / 'models' / 'simple_cnn.h5'
 face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 # Check if model exists
