@@ -1,9 +1,16 @@
 import os
+import sys
+from pathlib import Path
+
+# Memory optimization for Render
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import cv2
 import numpy as np
 from flask import Flask, render_template, Response, jsonify, request
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
+
 # Robust pathing for Render
 BASE_DIR = Path(__file__).parent
 app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
