@@ -4,6 +4,7 @@ from pathlib import Path
 
 # Memory optimization for Render
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_USE_LEGACY_KERAS'] = '1'
 
 import cv2
 import numpy as np
@@ -177,6 +178,5 @@ def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    import os
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 7860))
     app.run(host='0.0.0.0', port=port, debug=True)
