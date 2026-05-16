@@ -73,12 +73,16 @@ EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise"]
 
 @app.route('/debug')
 def debug_files():
+    import tensorflow as tf
+    import keras
     files_info = []
     for root, dirs, files in os.walk('.'):
         for name in files:
             p = os.path.join(root, name)
             files_info.append(f"{p} ({os.path.getsize(p)} bytes)")
     return jsonify({
+        "tf_version": tf.__version__,
+        "keras_version": keras.__version__,
         "cwd": os.getcwd(),
         "face_error": face_loading_error,
         "model_error": model_loading_error,
