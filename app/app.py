@@ -15,36 +15,59 @@ from tensorflow.keras.preprocessing.image import img_to_array
 BASE_DIR = Path(__file__).parent
 app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
 
+# Global variables to track loading status
+model_loading_error = "Not attempted"
+face_loading_error = "Not attempted"
+
 # Load Face Classifier (Haar Cascade)
 try:
     CASCADE_PATH = BASE_DIR / 'haarcascade_frontalface_default.xml'
+    if not CASCADE_PATH.exists():
+        CASCADE_PATH = BASE_DIR.parent / 'app' / 'haarcascade_frontalface_default.xml'
+
     face_classifier = cv2.CascadeClassifier(str(CASCADE_PATH))
     if face_classifier.empty():
-        raise Exception("Cascade Classifier is empty")
+        raise Exception(f"Classifier is empty at {CASCADE_PATH}")
     print(f"SUCCESS: Face Classifier Loaded from: {CASCADE_PATH}")
+    face_loading_error = "None"
 except Exception as e:
-    print(f"ERROR loading face classifier: {e}")
+    face_loading_error = str(e)
+    print(f"ERROR loading face classifier: {face_loading_error}")
     face_classifier = None
 
 # Load Emotion Model
 try:
     MODEL_PATH = BASE_DIR / 'simple_cnn.h5'
     if not MODEL_PATH.exists():
-        # Fallback to parent/models just in case
         MODEL_PATH = BASE_DIR.parent / 'models' / 'simple_cnn.h5'
     
     if MODEL_PATH.exists():
         model = load_model(str(MODEL_PATH))
         print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
+        model_loading_error = "None"
     else:
-        print("CRITICAL: Emotion Model not found anywhere!")
+        model_loading_error = f"File not found. Checked: {MODEL_PATH}"
         model = None
 except Exception as e:
-    print(f"ERROR loading model: {e}")
+    model_loading_error = f"Crash during load: {str(e)}"
+    print(f"ERROR loading model: {model_loading_error}")
     model = None
 
 EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise"]
-current_state = {"emotion": "Scanning...", "confidence": 0}
+
+@app.route('/debug')
+def debug_files():
+    files_info = []
+    for root, dirs, files in os.walk('.'):
+        for name in files:
+            p = os.path.join(root, name)
+            files_info.append(f"{p} ({os.path.getsize(p)} bytes)")
+    return jsonify({
+        "cwd": os.getcwd(),
+        "face_error": face_loading_error,
+        "model_error": model_loading_error,
+        "files_found": files_info
+    })
 
 def get_recommendation(emotion):
     recommendations = {
@@ -75,9 +98,9 @@ def predict():
     try:
         # CHECK MODELS
         if face_classifier is None:
-            return jsonify({"emotion": "Detector missing", "confidence": 0, "suggestion": "The face detector XML file is not loaded."})
+            return jsonify({"emotion": "Detector missing", "confidence": 0, "suggestion": f"Error: {face_loading_error}"})
         if model is None:
-            return jsonify({"emotion": "Model missing", "confidence": 0, "suggestion": "The trained emotion model (.h5) is not loaded."})
+            return jsonify({"emotion": "Model missing", "confidence": 0, "suggestion": f"Error: {model_loading_error}"})
 
         data = request.json
         image_data = data['image'].split(',')[1]
