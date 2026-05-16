@@ -42,7 +42,8 @@ try:
     for file in os.listdir(BASE_DIR):
         if file.lower() == 'simple_cnn.h5':
             MODEL_PATH = BASE_DIR / file
-            model = load_model(str(MODEL_PATH))
+            # Bypassing version mismatch errors with compile=False
+            model = load_model(str(MODEL_PATH), compile=False)
             print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
             model_loading_error = "None"
             model_found = True
@@ -55,7 +56,8 @@ try:
             for file in os.listdir(ROOT_MODELS):
                 if file.lower() == 'simple_cnn.h5':
                     MODEL_PATH = ROOT_MODELS / file
-                    model = load_model(str(MODEL_PATH))
+                    # Bypassing version mismatch errors with compile=False
+                    model = load_model(str(MODEL_PATH), compile=False)
                     print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
                     model_loading_error = "None"
                     model_found = True
