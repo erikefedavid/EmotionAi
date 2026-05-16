@@ -64,9 +64,16 @@ try:
                             # Recursively remove batch_shape and other K3 keys
                             def fix_layer(layer):
                                 if 'config' in layer:
+                                    # Strip K3 specific keys
                                     layer['config'].pop('batch_shape', None)
                                     layer['config'].pop('registered_name', None)
                                     layer['config'].pop('optional', None)
+                                    
+                                    # Handle DTypePolicy dicts
+                                    dtype = layer['config'].get('dtype')
+                                    if isinstance(dtype, dict) and 'config' in dtype:
+                                        layer['config']['dtype'] = dtype['config'].get('name', 'float32')
+                                        
                                 if 'layers' in layer:
                                     for sub in layer['layers']: fix_layer(sub)
                             
@@ -108,9 +115,16 @@ try:
                                     config = json.loads(model_config)
                                     def fix_layer(layer):
                                         if 'config' in layer:
+                                            # Strip K3 specific keys
                                             layer['config'].pop('batch_shape', None)
                                             layer['config'].pop('registered_name', None)
                                             layer['config'].pop('optional', None)
+                                            
+                                            # Handle DTypePolicy dicts
+                                            dtype = layer['config'].get('dtype')
+                                            if isinstance(dtype, dict) and 'config' in dtype:
+                                                layer['config']['dtype'] = dtype['config'].get('name', 'float32')
+                                                
                                         if 'layers' in layer:
                                             for sub in layer['layers']: fix_layer(sub)
                                     fix_layer(config['config'])
