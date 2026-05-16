@@ -43,8 +43,37 @@ try:
     for file in os.listdir(BASE_DIR):
         if file.lower() == 'simple_cnn.h5':
             MODEL_PATH = BASE_DIR / file
-            # Bypassing version mismatch errors with compile=False
-            model = load_model(str(MODEL_PATH), compile=False)
+            
+            try:
+                # First try: Normal load
+                model = load_model(str(MODEL_PATH), compile=False)
+            except Exception as e:
+                if 'batch_shape' in str(e) or 'registered_name' in str(e):
+                    print("Detected Keras version mismatch. Attempting configuration strip...")
+                    import h5py
+                    import json
+                    # Open the file and manually fix the config
+                    with h5py.File(str(MODEL_PATH), 'r+') as f:
+                        model_config = f.attrs.get('model_config')
+                        if model_config:
+                            config = json.loads(model_config.decode('utf-8'))
+                            # Recursively remove batch_shape and other K3 keys
+                            def fix_layer(layer):
+                                if 'config' in layer:
+                                    layer['config'].pop('batch_shape', None)
+                                    layer['config'].pop('registered_name', None)
+                                    layer['config'].pop('optional', None)
+                                if 'layers' in layer:
+                                    for sub in layer['layers']: fix_layer(sub)
+                            
+                            fix_layer(config['config'])
+                            f.attrs['model_config'] = json.dumps(config).encode('utf-8')
+                    
+                    # Try loading again after fix
+                    model = load_model(str(MODEL_PATH), compile=False)
+                else:
+                    raise e
+
             print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
             model_loading_error = "None"
             model_found = True
@@ -57,8 +86,31 @@ try:
             for file in os.listdir(ROOT_MODELS):
                 if file.lower() == 'simple_cnn.h5':
                     MODEL_PATH = ROOT_MODELS / file
-                    # Bypassing version mismatch errors with compile=False
-                    model = load_model(str(MODEL_PATH), compile=False)
+                    try:
+                        # First try: Normal load
+                        model = load_model(str(MODEL_PATH), compile=False)
+                    except Exception as e:
+                        if 'batch_shape' in str(e) or 'registered_name' in str(e):
+                            print("Detected Keras version mismatch. Attempting configuration strip...")
+                            import h5py
+                            import json
+                            with h5py.File(str(MODEL_PATH), 'r+') as f:
+                                model_config = f.attrs.get('model_config')
+                                if model_config:
+                                    config = json.loads(model_config.decode('utf-8'))
+                                    def fix_layer(layer):
+                                        if 'config' in layer:
+                                            layer['config'].pop('batch_shape', None)
+                                            layer['config'].pop('registered_name', None)
+                                            layer['config'].pop('optional', None)
+                                        if 'layers' in layer:
+                                            for sub in layer['layers']: fix_layer(sub)
+                                    fix_layer(config['config'])
+                                    f.attrs['model_config'] = json.dumps(config).encode('utf-8')
+                            model = load_model(str(MODEL_PATH), compile=False)
+                        else:
+                            raise e
+                            
                     print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
                     model_loading_error = "None"
                     model_found = True
