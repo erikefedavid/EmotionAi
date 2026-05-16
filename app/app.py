@@ -37,16 +37,32 @@ except Exception as e:
 
 # Load Emotion Model
 try:
-    MODEL_PATH = BASE_DIR / 'simple_cnn.h5'
-    if not MODEL_PATH.exists():
-        MODEL_PATH = BASE_DIR.parent / 'models' / 'simple_cnn.h5'
+    model_found = False
+    # Check all files in BASE_DIR for any .h5 file
+    for file in os.listdir(BASE_DIR):
+        if file.lower() == 'simple_cnn.h5':
+            MODEL_PATH = BASE_DIR / file
+            model = load_model(str(MODEL_PATH))
+            print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
+            model_loading_error = "None"
+            model_found = True
+            break
     
-    if MODEL_PATH.exists():
-        model = load_model(str(MODEL_PATH))
-        print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
-        model_loading_error = "None"
-    else:
-        model_loading_error = f"File not found. Checked: {MODEL_PATH}"
+    if not model_found:
+        # Check root models folder too
+        ROOT_MODELS = BASE_DIR.parent / 'models'
+        if ROOT_MODELS.exists():
+            for file in os.listdir(ROOT_MODELS):
+                if file.lower() == 'simple_cnn.h5':
+                    MODEL_PATH = ROOT_MODELS / file
+                    model = load_model(str(MODEL_PATH))
+                    print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
+                    model_loading_error = "None"
+                    model_found = True
+                    break
+                    
+    if not model_found:
+        model_loading_error = f"File simple_cnn.h5 not found in {BASE_DIR} or {BASE_DIR.parent / 'models'}. Files present in {BASE_DIR}: {os.listdir(BASE_DIR)}"
         model = None
 except Exception as e:
     model_loading_error = f"Crash during load: {str(e)}"
