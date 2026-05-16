@@ -1,8 +1,8 @@
-flask==3.0.0
-tensorflow-cpu>=2.16.1
-tf_keras
+flask
 opencv-python-headless
-numpy==1.26.4
-h5py==3.10.0
+tensorflow-cpu
+tf_keras
+numpy
+h5py
 Pillow
 gunicorn
