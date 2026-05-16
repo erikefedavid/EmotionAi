@@ -56,7 +56,11 @@ try:
                     with h5py.File(str(MODEL_PATH), 'r+') as f:
                         model_config = f.attrs.get('model_config')
                         if model_config:
-                            config = json.loads(model_config.decode('utf-8'))
+                            # Handle cases where config is already a string
+                            if hasattr(model_config, 'decode'):
+                                model_config = model_config.decode('utf-8')
+                            
+                            config = json.loads(model_config)
                             # Recursively remove batch_shape and other K3 keys
                             def fix_layer(layer):
                                 if 'config' in layer:
@@ -97,7 +101,11 @@ try:
                             with h5py.File(str(MODEL_PATH), 'r+') as f:
                                 model_config = f.attrs.get('model_config')
                                 if model_config:
-                                    config = json.loads(model_config.decode('utf-8'))
+                                    # Handle cases where config is already a string
+                                    if hasattr(model_config, 'decode'):
+                                        model_config = model_config.decode('utf-8')
+                                    
+                                    config = json.loads(model_config)
                                     def fix_layer(layer):
                                         if 'config' in layer:
                                             layer['config'].pop('batch_shape', None)
