@@ -6,7 +6,6 @@ from pathlib import Path
 
 # Must be set BEFORE any TF/Keras import
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['TF_USE_LEGACY_KERAS'] = '1'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 import cv2
@@ -14,10 +13,9 @@ import numpy as np
 from flask import Flask, render_template, Response, jsonify, request
 from PIL import Image
 
-# Use tf_keras explicitly — avoids Keras 3 batch_shape incompatibility
-import tf_keras
-from tf_keras.models import load_model
-from tf_keras.preprocessing.image import img_to_array
+# Use native Keras 3 loaders for .keras compatibility
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import img_to_array
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
@@ -53,12 +51,12 @@ for path in CASCADE_PATHS:
         if not clf.empty():
             face_classifier = clf
             face_error = None
-            print(f"✓ Face classifier loaded: {path}")
+            print(f"[OK] Face classifier loaded: {path}")
             break
 
 if face_classifier is None:
     face_error = f"Haar cascade not found. Searched: {[str(p) for p in CASCADE_PATHS]}"
-    print(f"✗ {face_error}")
+    print(f"[ERROR] {face_error}")
 
 # ── Load Emotion Model ───────────────────────────────────────────────────────
 model = None
@@ -75,17 +73,17 @@ for search_dir in MODEL_SEARCH_DIRS:
             try:
                 model = load_model(str(model_path), compile=False)
                 model_error = None
-                print(f"✓ Model loaded: {model_path}")
+                print(f"[OK] Model loaded: {model_path}")
             except Exception as e:
                 model_error = f"Load failed: {e}"
-                print(f"✗ {model_error}")
+                print(f"[ERROR] {model_error}")
             break
     if model is not None:
         break
 
 if model is None and model_error == "Not loaded":
     model_error = f"simple_cnn.h5 not found in: {[str(d) for d in MODEL_SEARCH_DIRS]}"
-    print(f"✗ {model_error}")
+    print(f"[ERROR] {model_error}")
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 @app.route('/')
@@ -103,7 +101,7 @@ def debug():
             files.append(f"{p} ({os.path.getsize(p):,} bytes)")
     return jsonify({
         "tf_version":    tf.__version__,
-        "tf_keras_version": tf_keras.__version__,
+        "keras_version": tf.keras.__version__,
         "cwd":           os.getcwd(),
         "model_error":   model_error,
         "face_error":    face_error,
