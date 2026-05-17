@@ -67,23 +67,24 @@ def robust_load_model(model_path):
                             config['config'].pop('registered_name', None)
                             config['config'].pop('build_input_shape', None)
                     
-                    # Recursive configuration stripping/simplifying
-                    def fix_layer(layer):
-                        if not isinstance(layer, dict):
+                    # Foolproof deeply recursive sanitizer
+                    def fix_layer(cfg):
+                        if not isinstance(cfg, dict):
                             return
                         
-                        if 'config' in layer and isinstance(layer['config'], dict):
-                            # Strip Keras 3 specific properties
-                            layer['config'].pop('batch_shape', None)
-                            layer['config'].pop('registered_name', None)
-                            layer['config'].pop('optional', None)
-                            layer['config'].pop('quantization_config', None)
-                            layer['config'].pop('build_input_shape', None)
+                        # If dictionary contains 'config', strip Keras 3 specifics from it
+                        if 'config' in cfg and isinstance(cfg['config'], dict):
+                            sub_cfg = cfg['config']
+                            sub_cfg.pop('batch_shape', None)
+                            sub_cfg.pop('registered_name', None)
+                            sub_cfg.pop('optional', None)
+                            sub_cfg.pop('quantization_config', None)
+                            sub_cfg.pop('build_input_shape', None)
                             
                             # Simplify DTypePolicy dict to string name (e.g. float32)
-                            dtype = layer['config'].get('dtype')
+                            dtype = sub_cfg.get('dtype')
                             if isinstance(dtype, dict) and 'config' in dtype:
-                                layer['config']['dtype'] = dtype['config'].get('name', 'float32')
+                                sub_cfg['dtype'] = dtype['config'].get('name', 'float32')
                             
                             # Simplify initializers and regularizers that are serialized as nested dicts
                             keys_to_simplify = [
@@ -93,17 +94,21 @@ def robust_load_model(model_path):
                                 'moving_mean_initializer', 'moving_variance_initializer'
                             ]
                             for key in keys_to_simplify:
-                                val = layer['config'].get(key)
+                                val = sub_cfg.get(key)
                                 if isinstance(val, dict) and 'class_name' in val:
-                                    layer['config'][key] = {
+                                    sub_cfg[key] = {
                                         'class_name': val['class_name'],
                                         'config': val.get('config', {})
                                     }
                         
-                        # Process sub-layers if present
-                        if 'layers' in layer and isinstance(layer['layers'], list):
-                            for sub in layer['layers']:
-                                fix_layer(sub)
+                        # Recursively traverse all values and list elements
+                        for val in cfg.values():
+                            if isinstance(val, dict):
+                                fix_layer(val)
+                            elif isinstance(val, list):
+                                for item in val:
+                                    if isinstance(item, dict):
+                                        fix_layer(item)
                     
                     fix_layer(config)
                     f.attrs['model_config'] = json.dumps(config).encode('utf-8')
