@@ -1,266 +1,173 @@
 import os
 import sys
+import base64
+import io
 from pathlib import Path
 
-# Memory optimization for Render
+# Must be set BEFORE any TF/Keras import
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_USE_LEGACY_KERAS'] = '1'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 import cv2
 import numpy as np
 from flask import Flask, render_template, Response, jsonify, request
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.image import img_to_array
-
-# Robust pathing for Render
-BASE_DIR = Path(__file__).parent
-app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
-
-# Global variables to track loading status
-model_loading_error = "Not attempted"
-face_loading_error = "Not attempted"
-
-# Load Face Classifier (Haar Cascade)
-try:
-    CASCADE_PATH = BASE_DIR / 'haarcascade_frontalface_default.xml'
-    if not CASCADE_PATH.exists():
-        CASCADE_PATH = BASE_DIR.parent / 'app' / 'haarcascade_frontalface_default.xml'
-
-    face_classifier = cv2.CascadeClassifier(str(CASCADE_PATH))
-    if face_classifier.empty():
-        raise Exception(f"Classifier is empty at {CASCADE_PATH}")
-    print(f"SUCCESS: Face Classifier Loaded from: {CASCADE_PATH}")
-    face_loading_error = "None"
-except Exception as e:
-    face_loading_error = str(e)
-    print(f"ERROR loading face classifier: {face_loading_error}")
-    face_classifier = None
-
-# Unified Robust Model Loader for Cross-Version Keras Compatibility
-def robust_load_model(model_path):
-    import h5py
-    import json
-    
-    try:
-        # First try standard Keras load
-        model = load_model(str(model_path), compile=False)
-        print(f"SUCCESS: Loaded model normally from {model_path}")
-        return model
-    except Exception as e:
-        print(f"Normal load failed for {model_path} with error: {e}")
-        print("Attempting to apply advanced Keras 3 -> Keras 2 configuration patch...")
-        
-        try:
-            with h5py.File(str(model_path), 'r+') as f:
-                model_config = f.attrs.get('model_config')
-                if model_config:
-                    if hasattr(model_config, 'decode'):
-                        model_config = model_config.decode('utf-8')
-                    
-                    config = json.loads(model_config)
-                    
-                    # Fix top-level sequential configs
-                    if isinstance(config, dict):
-                        config.pop('registered_name', None)
-                        config.pop('build_input_shape', None)
-                        if 'config' in config and isinstance(config['config'], dict):
-                            config['config'].pop('registered_name', None)
-                            config['config'].pop('build_input_shape', None)
-                    
-                    # Foolproof deeply recursive sanitizer
-                    def fix_layer(cfg):
-                        if not isinstance(cfg, dict):
-                            return
-                        
-                        # If dictionary contains 'config', strip Keras 3 specifics from it
-                        if 'config' in cfg and isinstance(cfg['config'], dict):
-                            sub_cfg = cfg['config']
-                            sub_cfg.pop('batch_shape', None)
-                            sub_cfg.pop('registered_name', None)
-                            sub_cfg.pop('optional', None)
-                            sub_cfg.pop('quantization_config', None)
-                            sub_cfg.pop('build_input_shape', None)
-                            
-                            # Simplify DTypePolicy dict to string name (e.g. float32)
-                            dtype = sub_cfg.get('dtype')
-                            if isinstance(dtype, dict) and 'config' in dtype:
-                                sub_cfg['dtype'] = dtype['config'].get('name', 'float32')
-                            
-                            # Simplify initializers and regularizers that are serialized as nested dicts
-                            keys_to_simplify = [
-                                'kernel_initializer', 'bias_initializer', 
-                                'kernel_regularizer', 'bias_regularizer', 'activity_regularizer',
-                                'beta_initializer', 'gamma_initializer',
-                                'moving_mean_initializer', 'moving_variance_initializer'
-                            ]
-                            for key in keys_to_simplify:
-                                val = sub_cfg.get(key)
-                                if isinstance(val, dict) and 'class_name' in val:
-                                    sub_cfg[key] = {
-                                        'class_name': val['class_name'],
-                                        'config': val.get('config', {})
-                                    }
-                        
-                        # Recursively traverse all values and list elements
-                        for val in cfg.values():
-                            if isinstance(val, dict):
-                                fix_layer(val)
-                            elif isinstance(val, list):
-                                for item in val:
-                                    if isinstance(item, dict):
-                                        fix_layer(item)
-                    
-                    fix_layer(config)
-                    f.attrs['model_config'] = json.dumps(config).encode('utf-8')
-                    print(f"Successfully wrote legacy compatibility configuration to {model_path} attributes!")
-            
-            # Try loading again after applying compatibility patch
-            model = load_model(str(model_path), compile=False)
-            print(f"SUCCESS: Loaded model after configuration patch from {model_path}")
-            return model
-        except Exception as patch_err:
-            print(f"Compatibility configuration patching failed: {patch_err}")
-            raise e
-
-# Load Emotion Model
-try:
-    model_found = False
-    model = None
-    
-    # 1. Search in BASE_DIR
-    for file in os.listdir(BASE_DIR):
-        if file.lower() == 'simple_cnn.h5':
-            MODEL_PATH = BASE_DIR / file
-            model = robust_load_model(MODEL_PATH)
-            model_loading_error = "None"
-            model_found = True
-            break
-            
-    # 2. Search in ROOT_MODELS if not found or failed
-    if not model_found:
-        ROOT_MODELS = BASE_DIR.parent / 'models'
-        if ROOT_MODELS.exists():
-            for file in os.listdir(ROOT_MODELS):
-                if file.lower() == 'simple_cnn.h5':
-                    MODEL_PATH = ROOT_MODELS / file
-                    model = robust_load_model(MODEL_PATH)
-                    model_loading_error = "None"
-                    model_found = True
-                    break
-                    
-    if not model_found:
-        model_loading_error = f"File simple_cnn.h5 not found in {BASE_DIR} or {BASE_DIR.parent / 'models'}. Files present: {os.listdir(BASE_DIR)}"
-        model = None
-except Exception as e:
-    model_loading_error = f"Crash during load: {str(e)}"
-    print(f"ERROR loading model: {model_loading_error}")
-    model = None
-
-EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise"]
-
-@app.route('/debug')
-def debug_files():
-    import tensorflow as tf
-    import keras
-    files_info = []
-    for root, dirs, files in os.walk('.'):
-        for name in files:
-            p = os.path.join(root, name)
-            files_info.append(f"{p} ({os.path.getsize(p)} bytes)")
-    return jsonify({
-        "tf_version": tf.__version__,
-        "keras_version": keras.__version__,
-        "cwd": os.getcwd(),
-        "face_error": face_loading_error,
-        "model_error": model_loading_error,
-        "files_found": files_info
-    })
-
-def get_recommendation(emotion):
-    recommendations = {
-        "Happy": "You're glowing! Perfect time to tackle your hardest task or share some joy. 🌟",
-        "Sad": "It's okay to feel down. How about a cup of tea and some relaxing Lo-Fi? ☕",
-        "Angry": "Deep breaths... counting to 10 often helps. Maybe some calm jazz? 🎷",
-        "Fear": "You're safe. Try some grounding exercises or talk to a friend. 🛡️",
-        "Surprise": "Wow! What a moment! Keep that curiosity alive. 🔍",
-        "Disgust": "Something's not right? Take a break and refresh your environment. 🍃",
-        "Scanning...": "Position your face in the frame to begin analysis. 🔍"
-    }
-    return recommendations.get(emotion, "Analyzing your mood...")
-
-@app.route('/status')
-def status():
-    return jsonify({
-        "emotion": current_state["emotion"],
-        "confidence": f"{current_state['confidence']:.1f}%",
-        "suggestion": get_recommendation(current_state["emotion"])
-    })
-
-import base64
-import io
 from PIL import Image
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    try:
-        # CHECK MODELS
-        if face_classifier is None:
-            return jsonify({"emotion": "Detector missing", "confidence": 0, "suggestion": f"Error: {face_loading_error}"})
-        if model is None:
-            return jsonify({"emotion": "Model missing", "confidence": 0, "suggestion": f"Error: {model_loading_error}"})
+# Use tf_keras explicitly — avoids Keras 3 batch_shape incompatibility
+import tf_keras
+from tf_keras.models import load_model
+from tf_keras.preprocessing.image import img_to_array
 
-        data = request.json
-        image_data = data['image'].split(',')[1]
-        image_bytes = base64.b64decode(image_data)
-        img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-        
-        # Convert to OpenCV format
-        frame = np.array(img)
-        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        
-        # HIGH SENSITIVITY DETECTION
-        faces = face_classifier.detectMultiScale(
-            gray, 
-            scaleFactor=1.1, 
-            minNeighbors=3, 
-            minSize=(20, 20)
-        )
-        
-        print(f"DEBUG: Found {len(faces)} faces in frame")
-        
-        if len(faces) == 0:
-            return jsonify({"emotion": "Searching...", "confidence": 0, "suggestion": "No face detected. Get closer and look directly at the camera."})
+# ── Paths ────────────────────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).parent
+ROOT_DIR = BASE_DIR.parent
 
-        # Process the first face
-        (x, y, w, h) = faces[0]
-        roi_gray = gray[y:y + h, x:x + w]
-        roi_gray = cv2.resize(roi_gray, (48, 48))
-        
-        if model:
-            roi = cv2.cvtColor(roi_gray, cv2.COLOR_GRAY2RGB)
-            roi = roi.astype('float') / 255.0
-            roi = img_to_array(roi)
-            roi = np.expand_dims(roi, axis=0)
+app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
 
-            prediction = model.predict(roi, verbose=0)[0]
-            label = EMOTIONS[prediction.argmax()]
-            confidence = float(np.max(prediction)) * 100
-            
-            return jsonify({
-                "emotion": label,
-                "confidence": f"{confidence:.1f}%",
-                "suggestion": get_recommendation(label)
-            })
-        
-        return jsonify({"error": "Model not loaded"}), 500
-    except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"error": str(e)}), 400
+# ── Constants ────────────────────────────────────────────────────────────────
+EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise"]
 
+RECOMMENDATIONS = {
+    "Happy":     "You're glowing! Perfect time to tackle your hardest task. 🌟",
+    "Sad":       "It's okay to feel down. How about some relaxing Lo-Fi? ☕",
+    "Angry":     "Deep breaths... counting to 10 often helps. 🎷",
+    "Fear":      "You're safe. Try some grounding exercises. 🛡️",
+    "Surprise":  "Wow! Keep that curiosity alive. 🔍",
+    "Disgust":   "Take a break and refresh your environment. 🍃",
+    "Scanning...": "Position your face in the frame to begin. 🔍"
+}
+
+# ── Load Face Classifier ─────────────────────────────────────────────────────
+face_classifier = None
+face_error = "Not loaded"
+
+CASCADE_PATHS = [
+    BASE_DIR / 'haarcascade_frontalface_default.xml',
+    BASE_DIR.parent / 'app' / 'haarcascade_frontalface_default.xml',
+]
+
+for path in CASCADE_PATHS:
+    if path.exists():
+        clf = cv2.CascadeClassifier(str(path))
+        if not clf.empty():
+            face_classifier = clf
+            face_error = None
+            print(f"✓ Face classifier loaded: {path}")
+            break
+
+if face_classifier is None:
+    face_error = f"Haar cascade not found. Searched: {[str(p) for p in CASCADE_PATHS]}"
+    print(f"✗ {face_error}")
+
+# ── Load Emotion Model ───────────────────────────────────────────────────────
+model = None
+model_error = "Not loaded"
+
+MODEL_SEARCH_DIRS = [BASE_DIR, ROOT_DIR / 'models']
+
+for search_dir in MODEL_SEARCH_DIRS:
+    if not search_dir.exists():
+        continue
+    for fname in os.listdir(search_dir):
+        if fname.lower() == 'simple_cnn_fixed.keras':
+            model_path = search_dir / fname
+            try:
+                model = load_model(str(model_path), compile=False)
+                model_error = None
+                print(f"✓ Model loaded: {model_path}")
+            except Exception as e:
+                model_error = f"Load failed: {e}"
+                print(f"✗ {model_error}")
+            break
+    if model is not None:
+        break
+
+if model is None and model_error == "Not loaded":
+    model_error = f"simple_cnn.h5 not found in: {[str(d) for d in MODEL_SEARCH_DIRS]}"
+    print(f"✗ {model_error}")
+
+# ── Routes ───────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+@app.route('/debug')
+def debug():
+    import tensorflow as tf
+    files = []
+    for root, _, fnames in os.walk('.'):
+        for name in fnames:
+            p = os.path.join(root, name)
+            files.append(f"{p} ({os.path.getsize(p):,} bytes)")
+    return jsonify({
+        "tf_version":    tf.__version__,
+        "tf_keras_version": tf_keras.__version__,
+        "cwd":           os.getcwd(),
+        "model_error":   model_error,
+        "face_error":    face_error,
+        "files":         files
+    })
+
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    # Guard checks
+    if face_classifier is None:
+        return jsonify({"emotion": "Detector missing", "confidence": 0,
+                        "suggestion": f"Error: {face_error}"}), 503
+    if model is None:
+        return jsonify({"emotion": "Model missing", "confidence": 0,
+                        "suggestion": f"Error: {model_error}"}), 503
+
+    try:
+        data = request.get_json(force=True)
+        image_data = data['image'].split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+
+        img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+        frame = np.array(img)
+        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+
+        faces = face_classifier.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=3,
+            minSize=(20, 20)
+        )
+
+        if len(faces) == 0:
+            return jsonify({
+                "emotion": "Searching...",
+                "confidence": 0,
+                "suggestion": "No face detected. Move closer and face the camera."
+            })
+
+        x, y, w, h = faces[0]
+        roi = gray[y:y + h, x:x + w]
+        roi = cv2.resize(roi, (48, 48))
+        roi = cv2.cvtColor(roi, cv2.COLOR_GRAY2RGB)
+        roi = roi.astype('float32') / 255.0
+        roi = img_to_array(roi)
+        roi = np.expand_dims(roi, axis=0)
+
+        prediction = model.predict(roi, verbose=0)[0]
+        emotion = EMOTIONS[prediction.argmax()]
+        confidence = float(np.max(prediction)) * 100
+
+        return jsonify({
+            "emotion":    emotion,
+            "confidence": f"{confidence:.1f}%",
+            "suggestion": RECOMMENDATIONS.get(emotion, "Analyzing...")
+        })
+
+    except Exception as e:
+        print(f"[predict error] {e}")
+        return jsonify({"error": str(e)}), 400
+
+
+# ── Entry Point ──────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 7860))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)

@@ -1,0 +1,32 @@
+Class name: Sequential
+Keys of config: ['class_name', 'config']
+Keys of config['config']: ['name', 'trainable', 'dtype', 'layers', 'build_input_shape']
+Number of layers: 14
+Layer 0: class_name=InputLayer, type of config=<class 'dict'>
+  Keys in layer config: ['batch_shape', 'dtype', 'sparse', 'ragged', 'name', 'optional']
+Layer 1: class_name=Conv2D, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'filters', 'kernel_size', 'strides', 'padding', 'data_format', 'dilation_rate', 'groups']
+Layer 2: class_name=BatchNormalization, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'axis', 'momentum', 'epsilon', 'center', 'scale', 'beta_initializer', 'gamma_initializer']
+Layer 3: class_name=MaxPooling2D, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'pool_size', 'padding', 'strides', 'data_format']
+Layer 4: class_name=Dropout, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'rate', 'seed', 'noise_shape']
+Layer 5: class_name=Conv2D, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'filters', 'kernel_size', 'strides', 'padding', 'data_format', 'dilation_rate', 'groups']
+Layer 6: class_name=BatchNormalization, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'axis', 'momentum', 'epsilon', 'center', 'scale', 'beta_initializer', 'gamma_initializer']
+Layer 7: class_name=MaxPooling2D, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'pool_size', 'padding', 'strides', 'data_format']
+Layer 8: class_name=Dropout, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'rate', 'seed', 'noise_shape']
+Layer 9: class_name=Flatten, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'data_format']
+Layer 10: class_name=Dense, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'units', 'activation', 'use_bias', 'kernel_initializer', 'bias_initializer', 'kernel_regularizer', 'bias_regularizer']
+Layer 11: class_name=BatchNormalization, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'axis', 'momentum', 'epsilon', 'center', 'scale', 'beta_initializer', 'gamma_initializer']
+Layer 12: class_name=Dropout, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'rate', 'seed', 'noise_shape']
+Layer 13: class_name=Dense, type of config=<class 'dict'>
+  Keys in layer config: ['name', 'trainable', 'dtype', 'units', 'activation', 'use_bias', 'kernel_initializer', 'bias_initializer', 'kernel_regularizer', 'bias_regularizer']

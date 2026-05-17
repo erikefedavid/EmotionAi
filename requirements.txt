@@ -1,7 +1,7 @@
 flask
 opencv-python-headless
-tensorflow-cpu
-tf_keras
+tensorflow-cpu==2.21.0
+tf_keras==2.21.0
 numpy
 h5py
 Pillow
