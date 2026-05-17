@@ -36,110 +36,115 @@ except Exception as e:
     print(f"ERROR loading face classifier: {face_loading_error}")
     face_classifier = None
 
+# Unified Robust Model Loader for Cross-Version Keras Compatibility
+def robust_load_model(model_path):
+    import h5py
+    import json
+    
+    try:
+        # First try standard Keras load
+        model = load_model(str(model_path), compile=False)
+        print(f"SUCCESS: Loaded model normally from {model_path}")
+        return model
+    except Exception as e:
+        print(f"Normal load failed for {model_path} with error: {e}")
+        print("Attempting to apply advanced Keras 3 -> Keras 2 configuration patch...")
+        
+        try:
+            with h5py.File(str(model_path), 'r+') as f:
+                model_config = f.attrs.get('model_config')
+                if model_config:
+                    if hasattr(model_config, 'decode'):
+                        model_config = model_config.decode('utf-8')
+                    
+                    config = json.loads(model_config)
+                    
+                    # Fix top-level sequential configs
+                    if isinstance(config, dict):
+                        config.pop('registered_name', None)
+                        config.pop('build_input_shape', None)
+                        if 'config' in config and isinstance(config['config'], dict):
+                            config['config'].pop('registered_name', None)
+                            config['config'].pop('build_input_shape', None)
+                    
+                    # Recursive configuration stripping/simplifying
+                    def fix_layer(layer):
+                        if not isinstance(layer, dict):
+                            return
+                        
+                        if 'config' in layer and isinstance(layer['config'], dict):
+                            # Strip Keras 3 specific properties
+                            layer['config'].pop('batch_shape', None)
+                            layer['config'].pop('registered_name', None)
+                            layer['config'].pop('optional', None)
+                            layer['config'].pop('quantization_config', None)
+                            layer['config'].pop('build_input_shape', None)
+                            
+                            # Simplify DTypePolicy dict to string name (e.g. float32)
+                            dtype = layer['config'].get('dtype')
+                            if isinstance(dtype, dict) and 'config' in dtype:
+                                layer['config']['dtype'] = dtype['config'].get('name', 'float32')
+                            
+                            # Simplify initializers and regularizers that are serialized as nested dicts
+                            keys_to_simplify = [
+                                'kernel_initializer', 'bias_initializer', 
+                                'kernel_regularizer', 'bias_regularizer', 'activity_regularizer',
+                                'beta_initializer', 'gamma_initializer',
+                                'moving_mean_initializer', 'moving_variance_initializer'
+                            ]
+                            for key in keys_to_simplify:
+                                val = layer['config'].get(key)
+                                if isinstance(val, dict) and 'class_name' in val:
+                                    layer['config'][key] = {
+                                        'class_name': val['class_name'],
+                                        'config': val.get('config', {})
+                                    }
+                        
+                        # Process sub-layers if present
+                        if 'layers' in layer and isinstance(layer['layers'], list):
+                            for sub in layer['layers']:
+                                fix_layer(sub)
+                    
+                    fix_layer(config)
+                    f.attrs['model_config'] = json.dumps(config).encode('utf-8')
+                    print(f"Successfully wrote legacy compatibility configuration to {model_path} attributes!")
+            
+            # Try loading again after applying compatibility patch
+            model = load_model(str(model_path), compile=False)
+            print(f"SUCCESS: Loaded model after configuration patch from {model_path}")
+            return model
+        except Exception as patch_err:
+            print(f"Compatibility configuration patching failed: {patch_err}")
+            raise e
+
 # Load Emotion Model
 try:
     model_found = False
-    # Check all files in BASE_DIR for any .h5 file
+    model = None
+    
+    # 1. Search in BASE_DIR
     for file in os.listdir(BASE_DIR):
         if file.lower() == 'simple_cnn.h5':
             MODEL_PATH = BASE_DIR / file
-            
-            try:
-                # First try: Normal load
-                model = load_model(str(MODEL_PATH), compile=False)
-            except Exception as e:
-                if 'batch_shape' in str(e) or 'registered_name' in str(e):
-                    print("Detected Keras version mismatch. Attempting configuration strip...")
-                    import h5py
-                    import json
-                    # Open the file and manually fix the config
-                    with h5py.File(str(MODEL_PATH), 'r+') as f:
-                        model_config = f.attrs.get('model_config')
-                        if model_config:
-                            # Handle cases where config is already a string
-                            if hasattr(model_config, 'decode'):
-                                model_config = model_config.decode('utf-8')
-                            
-                            config = json.loads(model_config)
-                            # Recursively remove batch_shape and other K3 keys
-                            def fix_layer(layer):
-                                if 'config' in layer:
-                                    # Strip K3 specific keys
-                                    layer['config'].pop('batch_shape', None)
-                                    layer['config'].pop('registered_name', None)
-                                    layer['config'].pop('optional', None)
-                                    
-                                    # Handle DTypePolicy dicts
-                                    dtype = layer['config'].get('dtype')
-                                    if isinstance(dtype, dict) and 'config' in dtype:
-                                        layer['config']['dtype'] = dtype['config'].get('name', 'float32')
-                                        
-                                if 'layers' in layer:
-                                    for sub in layer['layers']: fix_layer(sub)
-                            
-                            fix_layer(config['config'])
-                            f.attrs['model_config'] = json.dumps(config).encode('utf-8')
-                    
-                    # Try loading again after fix
-                    model = load_model(str(MODEL_PATH), compile=False)
-                else:
-                    raise e
-
-            print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
+            model = robust_load_model(MODEL_PATH)
             model_loading_error = "None"
             model_found = True
             break
-    
+            
+    # 2. Search in ROOT_MODELS if not found or failed
     if not model_found:
-        # Check root models folder too
         ROOT_MODELS = BASE_DIR.parent / 'models'
         if ROOT_MODELS.exists():
             for file in os.listdir(ROOT_MODELS):
                 if file.lower() == 'simple_cnn.h5':
                     MODEL_PATH = ROOT_MODELS / file
-                    try:
-                        # First try: Normal load
-                        model = load_model(str(MODEL_PATH), compile=False)
-                    except Exception as e:
-                        if 'batch_shape' in str(e) or 'registered_name' in str(e):
-                            print("Detected Keras version mismatch. Attempting configuration strip...")
-                            import h5py
-                            import json
-                            with h5py.File(str(MODEL_PATH), 'r+') as f:
-                                model_config = f.attrs.get('model_config')
-                                if model_config:
-                                    # Handle cases where config is already a string
-                                    if hasattr(model_config, 'decode'):
-                                        model_config = model_config.decode('utf-8')
-                                    
-                                    config = json.loads(model_config)
-                                    def fix_layer(layer):
-                                        if 'config' in layer:
-                                            # Strip K3 specific keys
-                                            layer['config'].pop('batch_shape', None)
-                                            layer['config'].pop('registered_name', None)
-                                            layer['config'].pop('optional', None)
-                                            
-                                            # Handle DTypePolicy dicts
-                                            dtype = layer['config'].get('dtype')
-                                            if isinstance(dtype, dict) and 'config' in dtype:
-                                                layer['config']['dtype'] = dtype['config'].get('name', 'float32')
-                                                
-                                        if 'layers' in layer:
-                                            for sub in layer['layers']: fix_layer(sub)
-                                    fix_layer(config['config'])
-                                    f.attrs['model_config'] = json.dumps(config).encode('utf-8')
-                            model = load_model(str(MODEL_PATH), compile=False)
-                        else:
-                            raise e
-                            
-                    print(f"SUCCESS: Emotion Model Loaded from: {MODEL_PATH}")
+                    model = robust_load_model(MODEL_PATH)
                     model_loading_error = "None"
                     model_found = True
                     break
                     
     if not model_found:
-        model_loading_error = f"File simple_cnn.h5 not found in {BASE_DIR} or {BASE_DIR.parent / 'models'}. Files present in {BASE_DIR}: {os.listdir(BASE_DIR)}"
+        model_loading_error = f"File simple_cnn.h5 not found in {BASE_DIR} or {BASE_DIR.parent / 'models'}. Files present: {os.listdir(BASE_DIR)}"
         model = None
 except Exception as e:
     model_loading_error = f"Crash during load: {str(e)}"
