@@ -2,7 +2,7 @@ flask
 opencv-python-headless
 tensorflow-cpu==2.21.0
 tf_keras==2.21.0
-numpy
+numpy<2.0.0
 h5py
 Pillow
 gunicorn
